@@ -1,6 +1,6 @@
-# TAPLE Tools
+# kore Tools
 
-Kore Tools are a group of utilities designed to facilitate the use of TAPLE Client, especially during testing and prototyping.
+Kore Tools are a group of utilities designed to facilitate the use of kore Client, especially during testing and prototyping.
 
 ## Build From Source
 
@@ -26,5 +26,5 @@ Prebuilt docker images are available at [Docker Hub]().
 
 If you want to build the image yourself, then you should do it in the following way:
 ```sh
-docker build -f ./Dockerfile.tools -t taple-tools .
+docker build -f ./Dockerfile.tools -t kore-tools .
 ```
