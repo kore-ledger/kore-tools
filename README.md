@@ -10,9 +10,9 @@ Minimium supported rust versión (MSRV) is 1.67.
 $ git clone git@github.com:kore-ledger/kore-tools.git
 $ cd kore-tools
 $ sudo apt install -y libprotobuf-dev protobuf-compiler cmake
-$ cargo install --locked --path tools/keygen
-$ cargo install --locked --path tools/patch
-$ cargo install --locked --path tools/sign
+$ cargo install --locked --path keygen
+$ cargo install --locked --path patch
+$ cargo install --locked --path sign
 $ kore-keygen -h
 $ kore-sign -h
 $ kore-patch -h
