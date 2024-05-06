@@ -1,0 +1,14 @@
+[package]
+name = "kore-keygen"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+kore-base = { workspace = true }
+clap = { workspace = true }
+hex = { workspace = true }
+libp2p = { workspace = true, features = ["secp256k1"] }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
