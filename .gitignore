@@ -3,3 +3,5 @@ target
 .DS_Store
 settings.toml
 Cargo.lock
+keys-secp2561k
+keys-Ed25519

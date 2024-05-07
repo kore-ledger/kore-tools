@@ -12,3 +12,6 @@ hex = { workspace = true }
 libp2p = { workspace = true, features = ["secp256k1"] }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+pkcs8 = { workspace = true }
+ed25519-dalek = {version = "2.1.0", features = ["pem", "std", "rand_core"]}
+hex-literal = "0.4.1"

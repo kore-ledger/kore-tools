@@ -1,11 +1,15 @@
-use std::str::FromStr;
-
 use clap::{Parser, ValueEnum};
-use libp2p::core::PeerId;
-use libp2p::identity::{ed25519::Keypair as EdKeyPair, secp256k1::SecretKey};
+use ed25519_dalek::SigningKey;
+use hex_literal::hex;
 use kore_base::crypto::{Ed25519KeyPair, KeyGenerator, KeyMaterial, KeyPair, Secp256k1KeyPair};
 use kore_base::identifier::{Derivable, KeyIdentifier};
-
+use libp2p::identity::{ed25519 as EdIdentify, secp256k1 as SecpIdentify, PublicKey};
+use libp2p::PeerId;
+use pkcs8::{pkcs5, EncodePrivateKey, EncodePublicKey, PrivateKeyInfo};
+use std::fs;
+use std::str::FromStr;
+/// cargo run -- -p Root1234
+/// cargo run -- -p secp256k1 -m secp256k1
 #[derive(Parser, Default, Debug)]
 #[command(override_help = "
     MC generation utility for KORE nodes\n
@@ -13,6 +17,7 @@ use kore_base::identifier::{Derivable, KeyIdentifier};
 \x1b[1m\x1b[4mOptions\x1b[0m:
     \x1b[1m-m, --mode\x1b[0m           Algorithm to use: ed25519 (default), secp256k1
     \x1b[1m-f, --format\x1b[0m         Output format: yaml(default), json
+    \x1b[1m-p, --password\x1b[0m       Password for encryption der files
     \x1b[1m-h, --help\x1b[0m           Print help information
     \x1b[1m-V, --version\x1b[0m        Print version information  
     ")]
@@ -23,6 +28,8 @@ struct Args {
     mode: Option<Algorithm>,
     #[clap(short = 'f', long = "format")]
     format: Option<Format>,
+    #[clap(short = 'p', long = "password")]
+    password: Option<String>,
 }
 
 #[derive(Parser, Clone, Debug, ValueEnum, Default)]
@@ -54,28 +61,40 @@ impl FromStr for Format {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Args = Args::parse();
     let format = args.format.unwrap_or(Format::Yaml);
+
+    if args.password.is_none() {
+        return Err("Password is required".into());
+    }
+
     let (kp, peer_id) = match args.mode.unwrap_or(Algorithm::Ed25519) {
         Algorithm::Ed25519 => {
             let keys = generate_ed25519();
-            let peer_id = PeerId::from_public_key(
-                &libp2p::identity::Keypair::Ed25519(
-                    EdKeyPair::decode(&mut keys.to_bytes()).expect("Decode of Ed25519 possible"),
-                )
-                .public(),
-            );
+
+            let peer_id = PeerId::from_public_key(&PublicKey::from(
+                EdIdentify::PublicKey::try_from_bytes(&keys.public_key_bytes())
+                    .expect("Error creating PeerId from public key"),
+            ));
+
+            let private_key = keys.secret_key_bytes();
+            let private_key_slice = private_key.as_slice();
+            write_keys(private_key_slice, &args.password.unwrap(), "keys-Ed25519")
+                .expect("Error writing keys to file");
+
             let keys = KeyPair::Ed25519(keys);
             (keys, peer_id)
         }
         Algorithm::Secp256k1 => {
             let keys = generate_secp256k1();
-            let peer_id = PeerId::from_public_key(
-                &libp2p::identity::Keypair::Secp256k1(
-                    SecretKey::from_bytes(&mut keys.secret_key_bytes())
-                        .expect("Be a valid Secp256k1 secret key")
-                        .into(),
-                )
-                .public(),
-            );
+            let peer_id = PeerId::from_public_key(&PublicKey::from(
+                SecpIdentify::PublicKey::try_from_bytes(&keys.public_key_bytes())
+                    .expect("Error creating PeerId from public key"),
+            ));
+
+            let private_key = keys.secret_key_bytes();
+            let private_key_slice = private_key.as_slice();
+            write_keys(private_key_slice, &args.password.unwrap(), "keys-secp2561k")
+                .expect("Error writing keys to file");
+
             let keys = KeyPair::Secp256k1(keys);
             (keys, peer_id)
         }
@@ -83,6 +102,53 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     show_data(kp, peer_id, format);
     Ok(())
+}
+
+fn write_keys(secret_key: &[u8], password: &str, path: &str) -> Result<(), String> {
+    match fs::create_dir_all(path) {
+        Ok(_) => {
+            let signing_key = secret_key;
+            let signing_key = SigningKey::from_bytes(signing_key[0..32].try_into().unwrap());
+            let der = match signing_key.to_pkcs8_der() {
+                Ok(der) => der,
+                Err(e) => {
+                    return Err(format!("Error converting to PKCS8 DER: {}", e));
+                }
+            };
+            let der_bytes = der.as_bytes();
+            let pbes2_params = match pkcs5::pbes2::Parameters::pbkdf2_sha256_aes256cbc(
+                2048,
+                &hex!("79d982e70df91a88"),
+                &hex!("b2d02d78b2efd9dff694cf8e0af40925"),
+            ) {
+                Ok(pbes2_params) => pbes2_params,
+                Err(e) => {
+                    return Err(format!("Error creating PBES2 parameters: {}", e));
+                }
+            };
+            let pk_text = match PrivateKeyInfo::try_from(der_bytes) {
+                Ok(pk_text) => pk_text,
+                Err(e) => {
+                    return Err(format!("Error creating PrivateKeyInfo: {}", e));
+                }
+            };
+            let pk_encrypted = match pk_text.encrypt_with_params(pbes2_params, password) {
+                Ok(pk_encrypted) => pk_encrypted,
+                Err(e) => {
+                    return Err(format!("Error encrypting private key: {}", e));
+                }
+            };
+            pk_encrypted
+                .write_der_file(format!("{}/private_key.der", path))
+                .map_err(|e| format!("Error writing private key to file: {}", e))?;
+            signing_key
+                .verifying_key()
+                .write_public_key_der_file(format!("{}/public_key.der", path))
+                .map_err(|e| format!("Error writing public key to file: {}", e))?;
+            Ok(())
+        }
+        Err(e) => Err(format!("Error creating directory: {}", e)),
+    }
 }
 
 fn show_data(kp: KeyPair, peer_id: PeerId, format: Format) {
