@@ -17,6 +17,7 @@ rust-version = "1.73"
 kore-base = { git = "https://github.com/kore-ledger/kore-base", version = "0.3.4", features = ["all"], branch = "main" }
 clap = { version = "4.5.4", features = ["string", "derive"] }
 hex = "0.4.3"
+hex-literal = "0.4.1"
 libp2p = { version = "0.53.2", default-features = false }
 serde_json = "1.0"
 serde_yaml = "0.9"
@@ -25,3 +26,7 @@ json-patch = "2"
 thiserror = "1"
 borsh = "1.2"
 pkcs8 = { version = "0.10.2", features = ["encryption"]}
+k256 = "0.13.3"
+der = "0.7.9"
+elliptic-curve = "0.13.8"
+ed25519 = {version = "2.2.3", default-features = false}

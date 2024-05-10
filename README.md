@@ -19,6 +19,17 @@ $ kore-patch -h
 ```
 
 ## Usage
+### Usage ok kore-keygen
+```bash
+# Generate pkcs8 encrpty with pkcs5(ED25519)
+kore-keygen -p a
+kore-keygen -p a -r keys-Ed25519/private_key.der
+kore-keygen -p a -r keys-Ed25519/public_key.der -d public-key
+# Generate pkcs8 encrpty with pkcs5(SECP256K1)
+kore-keygen -p a -m secp256k1
+kore-keygen -p a -r keys-secp2561k/private_key.der -m secp256k1
+kore-keygen -p a -r keys-secp2561k/public_key.der -m secp256k1 -d public-key
+```
 Visit the [Kore Tools guide](https://www.kore-ledger.net/docs/learn/) to learn how to use the tools.
 
 ## Docker images
