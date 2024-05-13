@@ -30,3 +30,4 @@ k256 = "0.13.3"
 der = "0.7.9"
 elliptic-curve = "0.13.8"
 ed25519 = {version = "2.2.3", default-features = false}
+tempfile = "3.2.0"

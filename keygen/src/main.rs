@@ -84,76 +84,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let format = args.format.unwrap_or(Format::Yaml);
     let algorithm = args.mode.unwrap_or(Algorithm::Ed25519);
     let typefile = args.typefile.unwrap_or(Typefile::PrivateKey);
-    if args.path.is_some() {
-        let file_path = args.path.as_ref().unwrap();
-        if fs::metadata(file_path).is_ok() {
-            match typefile {
-                Typefile::PrivateKey => {
-                    let document = Document::read_der_file(file_path)
-                        .map_err(|e| format!("Error reading file: {}", e))
-                        .unwrap();
-                    println!("PrivateKey");
-                    match EncryptedPrivateKeyInfo::try_from(document.as_bytes()) {
-                        Ok(enc_pk_info) => {
-                            println!("PrivateKey is encrypted with password");
-                            if args.password.is_none() {
-                                return Err("Password is required to decrypt".into());
-                            }
-                            let der_private_key = enc_pk_info
-                                .decrypt(args.password.as_ref().unwrap())
-                                .map_err(|e| format!("Error decrypting file: {}", e))
-                                .unwrap();
-
-                            let peer_id = get_peer_id_from_privatekey(
-                                der_private_key.as_bytes(),
-                                algorithm.clone(),
-                            );
-                            println!("Peer ID: {}", peer_id.to_string());
-                            return Ok(());
-                        }
-                        Err(_) => {
-                            println!("PrivateKey is not encrypted");
-                            let peer_id =
-                                get_peer_id_from_privatekey(document.as_bytes(), algorithm.clone());
-                            println!("Peer ID: {}", peer_id.to_string());
-                            return Ok(());
-                        }
-                    }
-                }
-                Typefile::PublicKey => match algorithm {
-                    Algorithm::Ed25519 => {
-                        println!("PublicKey with Ed25519");
-                        let document: ed25519::PublicKeyBytes =
-                            pkcs8::DecodePublicKey::read_public_key_der_file(file_path)
-                                .map_err(|e| format!("Error reading file: {}", e))
-                                .unwrap();
-                        let peer_id = get_peer_id_from_publickey(
-                            document.to_bytes()[0..32].try_into().unwrap(),
-                            algorithm.clone(),
-                        );
-                        println!("Peer ID: {}", peer_id.to_string());
-                        return Ok(());
-                    }
-                    Algorithm::Secp256k1 => {
-                        println!("PublicKey with Secp256k1");
-                        let document: k256::PublicKey =
-                            pkcs8::DecodePublicKey::read_public_key_der_file(file_path)
-                                .map_err(|e| format!("Error reading file: {}", e))
-                                .unwrap();
-                        let peer_id = get_peer_id_from_publickey(
-                            &document.to_sec1_bytes(),
-                            algorithm.clone(),
-                        );
-                        println!("Peer ID: {}", peer_id.to_string());
-                        return Ok(());
-                    }
-                },
-            }
-        }
+    let path = args.path.clone();
+    let password = args.password.clone();
+    if path.is_some() {
+        let peer_id = read_der_file(
+            path.as_deref(),
+            typefile.clone(),
+            algorithm.clone(),
+            password.as_deref(),
+        )
+        .unwrap();
+        println!("Peer ID: {}", peer_id.to_string());
+        return Ok(());
     }
+
     if args.password.is_none() {
         return Err("Password is required to encrypt".into());
     }
+    let (kp, peer_id) = generate_data(algorithm.clone());
+    let write_path = match algorithm {
+        Algorithm::Ed25519 => "keys-Ed25519",
+        Algorithm::Secp256k1 => "keys-secp2561k",
+        
+    };
+    write_keys(
+        kp.secret_key_bytes().as_slice(),
+        kp.public_key_bytes().as_slice(),
+        password.as_deref().unwrap(),
+        write_path,
+        algorithm,
+    )
+    .map_err(|e| format!("Error writing keys to file: {}", e))
+    .unwrap();
+    show_data(kp, peer_id, format);
+    Ok(())
+}
+// Generate KeyPair and PeerId from algorithm
+fn generate_data(algorithm: Algorithm) -> (KeyPair, PeerId) {
     let (kp, peer_id) = match algorithm {
         Algorithm::Ed25519 => {
             let keys = generate_ed25519();
@@ -161,15 +128,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 EdIdentify::PublicKey::try_from_bytes(&keys.public_key_bytes())
                     .expect("Error creating PeerId from public key"),
             ));
-            write_keys(
-                keys.secret_key_bytes().as_slice(),
-                keys.public_key_bytes().as_slice(),
-                &args.password.unwrap(),
-                "keys-Ed25519",
-                algorithm.clone(),
-            )
-            .expect("Error writing keys to file");
-
             let keys = KeyPair::Ed25519(keys);
             (keys, peer_id)
         }
@@ -179,28 +137,87 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 SecpIdentify::PublicKey::try_from_bytes(&keys.public_key_bytes())
                     .expect("Error creating PeerId from public key"),
             ));
-            write_keys(
-                keys.secret_key_bytes().as_slice(),
-                keys.public_key_bytes().as_slice(),
-                &args.password.unwrap(),
-                "keys-secp2561k",
-                algorithm.clone(),
-            )
-            .expect("Error writing keys to file");
-
             let keys = KeyPair::Secp256k1(keys);
             (keys, peer_id)
         }
     };
+    (kp, peer_id)
+}
 
-    show_data(kp, peer_id, format);
-    Ok(())
+// Read DER file and return PeerId
+fn read_der_file(
+    path: Option<&str>,
+    typefile: Typefile,
+    algorithm: Algorithm,
+    password: Option<&str>,
+) -> Result<PeerId, String> {
+    let path = path.unwrap();
+    if fs::metadata(path).is_ok() {
+        match typefile {
+            Typefile::PrivateKey => {
+                let document = Document::read_der_file(path)
+                    .map_err(|e| format!("Error reading file: {}", e))
+                    .unwrap();
+                // Check if private key is encrypted
+                match EncryptedPrivateKeyInfo::try_from(document.as_bytes()) {
+                    Ok(enc_pk_info) => {
+                        if password.is_none() {
+                            return Err("Password is required to decrypt".into());
+                        }
+                        let der_private_key = enc_pk_info
+                            .decrypt(password.unwrap())
+                            .map_err(|e| format!("Error decrypting file: {}", e))
+                            .unwrap();
+
+                        let peer_id = get_peer_id_from_privatekey(
+                            der_private_key.as_bytes(),
+                            algorithm.clone(),
+                        );
+                        Ok(peer_id)
+                    }
+                    Err(_) => {
+                        let peer_id =
+                            get_peer_id_from_privatekey(document.as_bytes(), algorithm.clone());
+                        Ok(peer_id)
+                    }
+                }
+            }
+            Typefile::PublicKey => match algorithm {
+                Algorithm::Ed25519 => {
+                    let document: ed25519::PublicKeyBytes =
+                        pkcs8::DecodePublicKey::read_public_key_der_file(path)
+                            .map_err(|e| format!("Error reading file: {}", e))
+                            .unwrap();
+                    let peer_id = get_peer_id_from_publickey(
+                        document.to_bytes()[0..32].try_into().unwrap(),
+                        algorithm.clone(),
+                    );
+                    Ok(peer_id)
+                }
+                Algorithm::Secp256k1 => {
+                    let document: k256::PublicKey =
+                        pkcs8::DecodePublicKey::read_public_key_der_file(path)
+                            .map_err(|e| format!("Error reading file: {}", e))
+                            .unwrap();
+                    let peer_id =
+                        get_peer_id_from_publickey(&document.to_sec1_bytes(), algorithm.clone());
+                    Ok(peer_id)
+                }
+            },
+        }
+    } else {
+        return Err("File not found".into());
+    }
 }
 fn get_peer_id_from_privatekey(document: &[u8], algorithm: Algorithm) -> PeerId {
     match algorithm {
         Algorithm::Ed25519 => {
             let decode_private_key: ed25519::KeypairBytes =
-                ed25519::pkcs8::KeypairBytes::from_pkcs8_der(document).unwrap();
+                ed25519::pkcs8::KeypairBytes::from_pkcs8_der(document)
+                    .map_err(|e| {
+                        format!("Error creating KeypairBytes(ED25519) from PKCS8 DER: {}", e)
+                    })
+                    .unwrap();
             let public_key = decode_private_key.public_key.unwrap();
             let public_key = EdIdentify::PublicKey::try_from_bytes(
                 public_key.to_bytes()[..32].try_into().unwrap(),
@@ -210,7 +227,9 @@ fn get_peer_id_from_privatekey(document: &[u8], algorithm: Algorithm) -> PeerId 
         }
         Algorithm::Secp256k1 => {
             let decode_private_key: Sec1SecretKey<k256::Secp256k1> =
-                elliptic_curve::SecretKey::from_pkcs8_der(document).unwrap();
+                elliptic_curve::SecretKey::from_pkcs8_der(document)
+                    .map_err(|e| format!("Error creating Sec1SecretKey from PKCS8 DER: {}", e))
+                    .unwrap();
             let public_key = decode_private_key.public_key();
             let public_key = SecpIdentify::PublicKey::try_from_bytes(&public_key.to_sec1_bytes())
                 .expect("Error creating PeerId from public key");
@@ -233,6 +252,9 @@ fn get_peer_id_from_publickey(document: &[u8], algorithm: Algorithm) -> PeerId {
         }
     }
 }
+// Write keys to file
+// Private key is encrypted with password
+// Public key is not encrypted
 fn write_keys(
     secret_key: &[u8],
     public_key: &[u8],
@@ -253,7 +275,6 @@ fn write_keys(
                         .map_err(|_| "Error al convertir Vec<u8> a [u8; 64]")?;
 
                     let signing_key = ed25519::KeypairBytes::from_bytes(&keypair_bytes_array);
-
                     let public_key = signing_key.public_key.unwrap();
 
                     let der = match signing_key.to_pkcs8_der() {
@@ -263,32 +284,15 @@ fn write_keys(
                         }
                     };
 
-                    let der_bytes = der.as_bytes();
-                    let pbes2_params = match pkcs5::pbes2::Parameters::pbkdf2_sha256_aes256cbc(
-                        2048,
-                        &hex!("79d982e70df91a88"),
-                        &hex!("b2d02d78b2efd9dff694cf8e0af40925"),
-                    ) {
-                        Ok(pbes2_params) => pbes2_params,
-                        Err(e) => {
-                            return Err(format!("Error creating PBES2 parameters: {}", e));
-                        }
-                    };
-                    let pk_text = match PrivateKeyInfo::try_from(der_bytes) {
-                        Ok(pk_text) => pk_text,
-                        Err(e) => {
-                            return Err(format!("Error creating PrivateKeyInfo: {}", e));
-                        }
-                    };
-                    let pk_encrypted = match pk_text.encrypt_with_params(pbes2_params, password) {
-                        Ok(pk_encrypted) => pk_encrypted,
-                        Err(e) => {
-                            return Err(format!("Error encrypting private key: {}", e));
-                        }
-                    };
+                    let pk_encrypted =
+                        encrypt_from_pkcs8_to_pkcs5(der.as_bytes(), password).unwrap();
+
+                    // Private key in pkcs8 encrypted with pkcs5
                     pk_encrypted
                         .write_der_file(format!("{}/private_key.der", path))
                         .map_err(|e| format!("Error writing private key to file: {}", e))?;
+
+                    // Public key in pksc8
                     public_key
                         .write_public_key_der_file(format!("{}/public_key.der", path))
                         .map_err(|e| format!("Error writing public key to file: {}", e))
@@ -297,40 +301,22 @@ fn write_keys(
                 Algorithm::Secp256k1 => {
                     let sec1_key: Sec1SecretKey<k256::Secp256k1> =
                         Sec1SecretKey::from_slice(secret_key).unwrap();
-                    let sec1_public_key = sec1_key.public_key();
 
+                    let sec1_public_key = sec1_key.public_key();
                     let sec1_der = sec1_key
                         .to_pkcs8_der()
                         .map_err(|e| format!("Error converting to PKCS8 DER: {}", e))
                         .unwrap();
-                    let sec1_der_bytes = sec1_der.as_bytes();
-                    let pbes2_params = match pkcs5::pbes2::Parameters::pbkdf2_sha256_aes256cbc(
-                        2048,
-                        &hex!("79d982e70df91a88"),
-                        &hex!("b2d02d78b2efd9dff694cf8e0af40925"),
-                    ) {
-                        Ok(pbes2_params) => pbes2_params,
-                        Err(e) => {
-                            return Err(format!("Error creating PBES2 parameters: {}", e));
-                        }
-                    };
-                    let pk_text = match PrivateKeyInfo::try_from(sec1_der_bytes) {
-                        Ok(pk_text) => pk_text,
-                        Err(e) => {
-                            return Err(format!("Error creating PrivateKeyInfo: {}", e));
-                        }
-                    };
-                    let pk_encrypted = match pk_text.encrypt_with_params(pbes2_params, password) {
-                        Ok(pk_encrypted) => pk_encrypted,
-                        Err(e) => {
-                            return Err(format!("Error encrypting private key: {}", e));
-                        }
-                    };
+
+                    let pk_encrypted =
+                        encrypt_from_pkcs8_to_pkcs5(sec1_der.as_bytes(), password).unwrap();
+
                     // Private key in pkcs8 encrypted with pkcs5
                     pk_encrypted
                         .write_der_file(format!("{}/private_key.der", path))
                         .map_err(|e| format!("Error writing private key to file: {}", e))
                         .unwrap();
+
                     // Public key in pksc8
                     sec1_public_key
                         .write_public_key_der_file(format!("{}/public_key.der", path))
@@ -343,6 +329,36 @@ fn write_keys(
         }
         Err(e) => Err(format!("Error creating directory: {}", e)),
     }
+}
+
+// Encrypt private key with password
+fn encrypt_from_pkcs8_to_pkcs5(
+    sec1_der_bytes: &[u8],
+    password: &str,
+) -> Result<pkcs8::SecretDocument, String> {
+    let pbes2_params = match pkcs5::pbes2::Parameters::pbkdf2_sha256_aes256cbc(
+        2048,
+        &hex!("79d982e70df91a88"),
+        &hex!("b2d02d78b2efd9dff694cf8e0af40925"),
+    ) {
+        Ok(pbes2_params) => pbes2_params,
+        Err(e) => {
+            return Err(format!("Error creating PBES2 parameters: {}", e));
+        }
+    };
+    let pk_text = match PrivateKeyInfo::try_from(sec1_der_bytes) {
+        Ok(pk_text) => pk_text,
+        Err(e) => {
+            return Err(format!("Error creating PrivateKeyInfo: {}", e));
+        }
+    };
+    let pk_encrypted = match pk_text.encrypt_with_params(pbes2_params, password) {
+        Ok(pk_encrypted) => pk_encrypted,
+        Err(e) => {
+            return Err(format!("Error encrypting private key: {}", e));
+        }
+    };
+    Ok(pk_encrypted)
 }
 
 fn show_data(kp: KeyPair, peer_id: PeerId, format: Format) {
@@ -378,4 +394,114 @@ fn generate_ed25519() -> Ed25519KeyPair {
 
 fn generate_secp256k1() -> Secp256k1KeyPair {
     Secp256k1KeyPair::from_seed(&[])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn verify_peer_id_with_ed25519_private_key() {
+        let password = "password";
+        let algorithm = Algorithm::Ed25519;
+        let (kp, peer_id) = generate_data(algorithm.clone());
+        let temp_dir = tempdir().unwrap();
+        let private_key_path = temp_dir.path().join("private_key.der");
+        write_keys(
+            kp.secret_key_bytes().as_slice(),
+            kp.public_key_bytes().as_slice(),
+            password,
+            temp_dir.path().to_str().unwrap(),
+            algorithm.clone(),
+        )
+        .unwrap();
+
+        let peer_from_der = read_der_file(
+            private_key_path.to_str(),
+            Typefile::PrivateKey,
+            algorithm.clone(),
+            Some(password),
+        );
+        temp_dir.close().unwrap();
+        assert_eq!(peer_id.to_string(), peer_from_der.unwrap().to_string());
+    }
+
+    #[test]
+    fn verify_peer_id_with_ed25519_public_key() {
+        let password = "password";
+        let algorithm = Algorithm::Ed25519;
+        let (kp, peer_id) = generate_data(algorithm.clone());
+        let temp_dir = tempdir().unwrap();
+        let public_key_path = temp_dir.path().join("public_key.der");
+        write_keys(
+            kp.secret_key_bytes().as_slice(),
+            kp.public_key_bytes().as_slice(),
+            password,
+            temp_dir.path().to_str().unwrap(),
+            algorithm.clone(),
+        )
+        .unwrap();
+
+        let peer_from_der = read_der_file(
+            public_key_path.to_str(),
+            Typefile::PublicKey,
+            algorithm.clone(),
+            Some(password),
+        );
+
+        temp_dir.close().unwrap();
+        assert_eq!(peer_id.to_string(), peer_from_der.unwrap().to_string());
+    }
+
+    #[test]
+    fn verify_peer_id_with_secp256k1_private_key() {
+        let password = "password";
+        let algorithm = Algorithm::Secp256k1;
+        let (kp, peer_id) = generate_data(algorithm.clone());
+        let temp_dir = tempdir().unwrap();
+        let private_key_path = temp_dir.path().join("private_key.der");
+        write_keys(
+            kp.secret_key_bytes().as_slice(),
+            kp.public_key_bytes().as_slice(),
+            password,
+            temp_dir.path().to_str().unwrap(),
+            algorithm.clone(),
+        )
+        .unwrap();
+
+        let peer_from_der = read_der_file(
+            private_key_path.to_str(),
+            Typefile::PrivateKey,
+            algorithm.clone(),
+            Some(password),
+        );
+        temp_dir.close().unwrap();
+        assert_eq!(peer_id.to_string(), peer_from_der.unwrap().to_string());
+    }
+    #[test]
+    fn verify_peer_id_with_secp256k1_public_key() {
+        let password = "password";
+        let algorithm = Algorithm::Secp256k1;
+        let (kp, peer_id) = generate_data( algorithm.clone());
+        let temp_dir = tempdir().unwrap();
+        let public_key_path = temp_dir.path().join("public_key.der");
+        write_keys(
+            kp.secret_key_bytes().as_slice(),
+            kp.public_key_bytes().as_slice(),
+            password,
+            temp_dir.path().to_str().unwrap(),
+            algorithm.clone(),
+        )
+        .unwrap();
+
+        let peer_from_der = read_der_file(
+            public_key_path.to_str(),
+            Typefile::PublicKey,
+            algorithm.clone(),
+            Some(password),
+        );
+        temp_dir.close().unwrap();
+        assert_eq!(peer_id.to_string(), peer_from_der.unwrap().to_string());
+    }
 }

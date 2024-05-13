@@ -18,3 +18,4 @@ k256 = { workspace = true }
 der = { workspace = true }
 elliptic-curve = { workspace = true }
 ed25519 = { workspace = true, features = ["alloc"]}
+tempfile = { workspace = true }
