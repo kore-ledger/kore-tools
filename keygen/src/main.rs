@@ -1,7 +1,6 @@
 use clap::{Parser, ValueEnum};
 use elliptic_curve::SecretKey as Sec1SecretKey;
 use hex_literal::hex;
-use k256;
 use kore_base::crypto::{Ed25519KeyPair, KeyGenerator, KeyMaterial, KeyPair, Secp256k1KeyPair};
 use kore_base::identifier::{Derivable, KeyIdentifier};
 use libp2p::identity::{ed25519 as EdIdentify, secp256k1 as SecpIdentify, PublicKey};
@@ -94,7 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             password.as_deref(),
         )
         .unwrap();
-        println!("Peer ID: {}", peer_id.to_string());
+        println!("Peer ID: {}", peer_id);
         return Ok(());
     }
 
@@ -206,7 +205,7 @@ fn read_der_file(
             },
         }
     } else {
-        return Err("File not found".into());
+        Err("File not found".into())
     }
 }
 fn get_peer_id_from_privatekey(document: &[u8], algorithm: Algorithm) -> PeerId {
