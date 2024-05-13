@@ -104,7 +104,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let write_path = match algorithm {
         Algorithm::Ed25519 => "keys-Ed25519",
         Algorithm::Secp256k1 => "keys-secp2561k",
-        
     };
     write_keys(
         kp.secret_key_bytes().as_slice(),
@@ -118,7 +117,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     show_data(kp, peer_id, format);
     Ok(())
 }
-// Generate KeyPair and PeerId from algorithm
+/// This function generates a key pair and a peer ID based on the specified algorithm.
+///
+/// # Parameters
+///
+/// * `algorithm`: An `Algorithm` enum representing the algorithm to be used for key generation.
+///
+/// # Returns
+///
+/// * `(KeyPair, PeerId)`: A tuple containing the generated key pair and the peer ID.
+///
+/// # Panics
+///
+/// This function will panic if there is an error creating the PeerId from the public key.
 fn generate_data(algorithm: Algorithm) -> (KeyPair, PeerId) {
     let (kp, peer_id) = match algorithm {
         Algorithm::Ed25519 => {
@@ -143,7 +154,25 @@ fn generate_data(algorithm: Algorithm) -> (KeyPair, PeerId) {
     (kp, peer_id)
 }
 
-// Read DER file and return PeerId
+/// This function reads a DER file at the specified path and returns a PeerId.
+///
+/// # Parameters
+///
+/// * `path`: An Option containing a reference to a string representing the file path.
+/// * `typefile`: A `Typefile` enum representing the type of file (private key or public key).
+/// * `algorithm`: An `Algorithm` enum representing the algorithm used for the keys.
+/// * `password`: An Option containing a reference to a string representing the password to decrypt the private key.
+///
+/// # Returns
+///
+/// * `Ok(PeerId)`: If the operation is successful, it returns an `Ok` with the PeerId.
+/// * `Err(String)`: If an error occurs during the operation, it returns an `Err` with an error message.
+///
+/// # Errors
+///
+/// This function will return an error if the file does not exist, if there is an error reading the file, if the private key 
+/// is encrypted and no password is provided, if there is an error decrypting the file, or if there is an error converting
+///  the public key bytes to a PeerId.
 fn read_der_file(
     path: Option<&str>,
     typefile: Typefile,
@@ -208,6 +237,7 @@ fn read_der_file(
         Err("File not found".into())
     }
 }
+
 fn get_peer_id_from_privatekey(document: &[u8], algorithm: Algorithm) -> PeerId {
     match algorithm {
         Algorithm::Ed25519 => {
@@ -251,9 +281,24 @@ fn get_peer_id_from_publickey(document: &[u8], algorithm: Algorithm) -> PeerId {
         }
     }
 }
-// Write keys to file
-// Private key is encrypted with password
-// Public key is not encrypted
+/// This function writes the secret and public keys to the specified path, encrypting the secret key with the provided password.
+///
+/// # Parameters
+///
+/// * `secret_key`: A byte slice representing the secret key.
+/// * `public_key`: A byte slice representing the public key.
+/// * `password`: A string representing the password to encrypt the secret key.
+/// * `path`: A string representing the path where the keys will be written.
+/// * `algorithm`: An `Algorithm` enum representing the algorithm used for the keys.
+///
+/// # Returns
+///
+/// * `Ok(())`: If the operation is successful, it returns an `Ok` with unit type.
+/// * `Err(String)`: If an error occurs during the operation, it returns an `Err` with an error message.
+///
+/// # Errors
+///
+/// This function will return an error if the directory creation fails, if the conversion from Vec<u8> to [u8; 64] fails, if the conversion to PKCS8 DER fails, or if the writing of the keys to the files fails.
 fn write_keys(
     secret_key: &[u8],
     public_key: &[u8],
@@ -330,7 +375,21 @@ fn write_keys(
     }
 }
 
-// Encrypt private key with password
+/// This function takes a private key in PKCS#8 format and a password, and returns the encrypted private key in PKCS#5 format.
+///
+/// # Parameters
+///
+/// * `sec1_der_bytes`: A reference to a byte slice representing the private key in PKCS#8 format.
+/// * `password`: A reference to a string representing the password to encrypt the private key.
+///
+/// # Returns
+///
+/// * `Ok(pkcs8::SecretDocument)`: If the operation is successful, it returns a PKCS#8 secret document containing the encrypted private key.
+/// * `Err(String)`: If an error occurs during the operation, it returns an `Err` with an error message.
+///
+/// # Errors
+///
+/// This function will return an error if the creation of the PBES2 parameters, the creation of the PrivateKeyInfo, or the encryption of the private key fails.
 fn encrypt_from_pkcs8_to_pkcs5(
     sec1_der_bytes: &[u8],
     password: &str,
@@ -482,7 +541,7 @@ mod tests {
     fn verify_peer_id_with_secp256k1_public_key() {
         let password = "password";
         let algorithm = Algorithm::Secp256k1;
-        let (kp, peer_id) = generate_data( algorithm.clone());
+        let (kp, peer_id) = generate_data(algorithm.clone());
         let temp_dir = tempdir().unwrap();
         let public_key_path = temp_dir.path().join("public_key.der");
         write_keys(
