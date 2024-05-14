@@ -16,7 +16,7 @@ keywords = ["blockchain", "distributed-ledger", "kore", "sustainability"]
 rust-version = "1.73"
 
 [workspace.dependencies]
-kore-base = { git = "https://github.com/kore-ledger/kore-base", version = "0.3.4", features = ["all"], branch = "main" }
+kore-base = { git = "https://github.com/kore-ledger/kore-base", version = "0.5.1", features = ["all"], branch = "main" }
 clap = { version = "4.5.4", features = ["string", "derive"] }
 hex = "0.4.3"
 hex-literal = "0.4.1"

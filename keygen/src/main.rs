@@ -1,7 +1,7 @@
 use clap::{Parser, ValueEnum};
 use elliptic_curve::SecretKey as Sec1SecretKey;
 use hex_literal::hex;
-use kore_base::crypto::{Ed25519KeyPair, KeyGenerator, KeyMaterial, KeyPair, Secp256k1KeyPair};
+use kore_base::keys::{Ed25519KeyPair, KeyGenerator, KeyMaterial, KeyPair, Secp256k1KeyPair};
 use kore_base::identifier::{Derivable, KeyIdentifier};
 use libp2p::identity::{ed25519 as EdIdentify, secp256k1 as SecpIdentify, PublicKey};
 use libp2p::PeerId;

@@ -2,7 +2,7 @@ use clap::{Parser, ValueEnum};
 
 use serde::{Deserialize, Serialize};
 
-use kore_base::{crypto::KeyPair, signature::Signature, EventRequest};
+use kore_base::{signature::Signature, EventRequest, keys::KeyPair};
 
 #[derive(Parser, Default, Debug)]
 #[clap(
