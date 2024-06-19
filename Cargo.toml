@@ -16,7 +16,7 @@ keywords = ["blockchain", "distributed-ledger", "kore", "sustainability"]
 rust-version = "1.73"
 
 [workspace.dependencies]
-kore-base = { git = "https://github.com/kore-ledger/kore-base", version = "0.5.1", features = ["all"], branch = "main" }
+kore-base = { git = "https://github.com/kore-ledger/kore-base", version = "0.5.12", features = ["all"], branch = "main" }
 clap = { version = "4.5.4", features = ["string", "derive"] }
 hex = "0.4.3"
 hex-literal = "0.4.1"
@@ -33,3 +33,4 @@ der = "0.7.9"
 elliptic-curve = "0.13.8"
 ed25519 = {version = "2.2.3", default-features = false}
 tempfile = "3.2.0"
+wasmtime = "20.0.2"
