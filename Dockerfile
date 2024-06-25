@@ -4,36 +4,40 @@
 # docker tag kore-tools:amd64 koreadmin/kore-tools:amd64
 # docker manifest create koreadmin/kore-tools:latest koreadmin/kore-tools:arm64 koreadmin/kore-tools:amd64
 # docker manifest push koreadmin/kore-tools:latest
-FROM rust:1.78-slim-buster as builder-arm64
+FROM messense/rust-musl-cross:aarch64-musl as builder-arm64
 RUN apt-get update && apt-get install --no-install-recommends -y build-essential cmake \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 COPY . .
-RUN cargo install --path keygen
-RUN cargo install --path sign
-RUN cargo install --path patch
+RUN rustup target add aarch64-unknown-linux-musl
+RUN cargo build --release --target aarch64-unknown-linux-musl --bin kore-keygen
+RUN cargo build --release --target aarch64-unknown-linux-musl --bin kore-sign
+RUN cargo build --release --target aarch64-unknown-linux-musl --bin kore-patch
 
-FROM rust:1.78-slim-buster as arm64
-COPY --from=builder-arm64 /usr/local/cargo/bin/kore-keygen /usr/local/bin/kore-keygen
-COPY --from=builder-arm64 /usr/local/cargo/bin/kore-sign /usr/local/bin/kore-sign
-COPY --from=builder-arm64 /usr/local/cargo/bin/kore-patch /usr/local/bin/kore-patch
+FROM alpine:3.19 as arm64
+COPY --from=builder-arm64 /home/rust/src/target/aarch64-unknown-linux-musl/release/kore-keygen /usr/local/bin/kore-keygen
+COPY --from=builder-arm64 /home/rust/src//target/aarch64-unknown-linux-musl/release/kore-sign /usr/local/bin/kore-sign
+COPY --from=builder-arm64 /home/rust/src//target/aarch64-unknown-linux-musl/release/kore-patch /usr/local/bin/kore-patch
+RUN apk add --no-cache --upgrade bash
 COPY run.sh ./script/run.sh
 RUN chmod +x ./script/run.sh
 ENTRYPOINT ["/script/run.sh"]
 
-FROM rust:1.78-slim-buster as builder-amd64
+FROM messense/rust-musl-cross:x86_64-musl as builder-amd64
 RUN apt-get update && apt-get install --no-install-recommends -y build-essential cmake \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 COPY . .
-RUN cargo install --path keygen
-RUN cargo install --path sign
-RUN cargo install --path patch
+RUN rustup target add aarch64-unknown-linux-musl
+RUN cargo build --release --target aarch64-unknown-linux-musl --bin kore-keygen
+RUN cargo build --release --target aarch64-unknown-linux-musl --bin kore-sign
+RUN cargo build --release --target aarch64-unknown-linux-musl --bin kore-patch
 
-FROM rust:1.78-slim-buster as amd64
-COPY --from=builder-amd64 /usr/local/cargo/bin/kore-keygen /usr/local/bin/kore-keygen
-COPY --from=builder-amd64 /usr/local/cargo/bin/kore-sign /usr/local/bin/kore-sign
-COPY --from=builder-amd64 /usr/local/cargo/bin/kore-patch /usr/local/bin/kore-patch
+FROM alpine:3.19 as amd64
+COPY --from=builder-arm64 /home/rust/src/target/aarch64-unknown-linux-musl/release/kore-keygen /usr/local/bin/kore-keygen
+COPY --from=builder-arm64 /home/rust/src//target/aarch64-unknown-linux-musl/release/kore-sign /usr/local/bin/kore-sign
+COPY --from=builder-arm64 /home/rust/src//target/aarch64-unknown-linux-musl/release/kore-patch /usr/local/bin/kore-patch
+RUN apk add --no-cache --upgrade bash
 COPY run.sh ./script/run.sh
 RUN chmod +x ./script/run.sh
 ENTRYPOINT ["/script/run.sh"]
