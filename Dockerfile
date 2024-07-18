@@ -14,7 +14,7 @@ RUN cargo build --release --target aarch64-unknown-linux-musl --bin kore-keygen
 RUN cargo build --release --target aarch64-unknown-linux-musl --bin kore-sign
 RUN cargo build --release --target aarch64-unknown-linux-musl --bin kore-patch
 
-FROM alpine:3.19 as arm64
+FROM alpine:3.16 as arm64
 COPY --from=builder-arm64 /home/rust/src/target/aarch64-unknown-linux-musl/release/kore-keygen /usr/local/bin/kore-keygen
 COPY --from=builder-arm64 /home/rust/src//target/aarch64-unknown-linux-musl/release/kore-sign /usr/local/bin/kore-sign
 COPY --from=builder-arm64 /home/rust/src//target/aarch64-unknown-linux-musl/release/kore-patch /usr/local/bin/kore-patch
@@ -33,7 +33,7 @@ RUN cargo build --release --target aarch64-unknown-linux-musl --bin kore-keygen
 RUN cargo build --release --target aarch64-unknown-linux-musl --bin kore-sign
 RUN cargo build --release --target aarch64-unknown-linux-musl --bin kore-patch
 
-FROM alpine:3.19 as amd64
+FROM alpine:3.16 as amd64
 COPY --from=builder-arm64 /home/rust/src/target/aarch64-unknown-linux-musl/release/kore-keygen /usr/local/bin/kore-keygen
 COPY --from=builder-arm64 /home/rust/src//target/aarch64-unknown-linux-musl/release/kore-sign /usr/local/bin/kore-sign
 COPY --from=builder-arm64 /home/rust/src//target/aarch64-unknown-linux-musl/release/kore-patch /usr/local/bin/kore-patch
