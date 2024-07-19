@@ -1,8 +1,8 @@
 use clap::{Parser, ValueEnum};
 use elliptic_curve::SecretKey as Sec1SecretKey;
 use hex_literal::hex;
-use kore_base::keys::{Ed25519KeyPair, KeyGenerator, KeyMaterial, KeyPair, Secp256k1KeyPair};
 use kore_base::identifier::{Derivable, KeyIdentifier};
+use kore_base::keys::{Ed25519KeyPair, KeyGenerator, KeyMaterial, KeyPair, Secp256k1KeyPair};
 use libp2p::identity::{ed25519 as EdIdentify, secp256k1 as SecpIdentify, PublicKey};
 use libp2p::PeerId;
 use pkcs8::{
@@ -177,7 +177,7 @@ fn generate_data(algorithm: Algorithm) -> (KeyPair, PeerId) {
 ///
 /// # Errors
 ///
-/// This function will return an error if the file does not exist, if there is an error reading the file, if the private key 
+/// This function will return an error if the file does not exist, if there is an error reading the file, if the private key
 /// is encrypted and no password is provided, if there is an error decrypting the file, or if there is an error converting
 ///  the public key bytes to a PeerId.
 fn read_der_file(
@@ -209,7 +209,6 @@ fn read_der_file(
                             algorithm.clone(),
                         );
                         Ok((data.0, Some(data.1)))
-                        
                     }
                     Err(_) => {
                         let data =
@@ -261,11 +260,14 @@ fn get_peer_id_from_privatekey(document: &[u8], algorithm: Algorithm) -> (PeerId
             )
             .expect("Error creating PeerId from public key");
             let keypair_bytes_array: [u8; 64] = decode_private_key.to_bytes().unwrap();
-            let private_key_bytes: [u8; 32] = keypair_bytes_array[..32].try_into().expect("slice with incorrect length");
-            
-               ( PeerId::from_public_key(&PublicKey::from(public_key)),
-               KeyPair::Ed25519(Ed25519KeyPair::from_secret_key(&private_key_bytes)))
-            
+            let private_key_bytes: [u8; 32] = keypair_bytes_array[..32]
+                .try_into()
+                .expect("slice with incorrect length");
+
+            (
+                PeerId::from_public_key(&PublicKey::from(public_key)),
+                KeyPair::Ed25519(Ed25519KeyPair::from_secret_key(&private_key_bytes)),
+            )
         }
         Algorithm::Secp256k1 => {
             let decode_private_key: Sec1SecretKey<k256::Secp256k1> =
@@ -275,7 +277,11 @@ fn get_peer_id_from_privatekey(document: &[u8], algorithm: Algorithm) -> (PeerId
             let public_key = decode_private_key.public_key();
             let public_key = SecpIdentify::PublicKey::try_from_bytes(&public_key.to_sec1_bytes())
                 .expect("Error creating PeerId from public key");
-            let keypair_bytes: [u8; 32] = decode_private_key.to_bytes().as_slice().try_into().expect("slice with incorrect length");
+            let keypair_bytes: [u8; 32] = decode_private_key
+                .to_bytes()
+                .as_slice()
+                .try_into()
+                .expect("slice with incorrect length");
             (
                 PeerId::from_public_key(&PublicKey::from(public_key)),
                 KeyPair::Secp256k1(Secp256k1KeyPair::from_secret_key(&keypair_bytes)),
@@ -442,7 +448,8 @@ fn show_data(kp: Option<KeyPair>, peer_id: PeerId, format: Format) {
             let private_key = keypair.secret_key_bytes();
             let hex_private_key = hex::encode(private_key);
             let public_key = keypair.public_key_bytes();
-            let key_identifier = KeyIdentifier::new(keypair.get_key_derivator(), &public_key).to_str();
+            let key_identifier =
+                KeyIdentifier::new(keypair.get_key_derivator(), &public_key).to_str();
 
             match format {
                 Format::Json => {
@@ -465,27 +472,24 @@ fn show_data(kp: Option<KeyPair>, peer_id: PeerId, format: Format) {
                 }
             }
         }
-        None => {
-            match format {
-                Format::Json => {
-                    let json = serde_json::to_string_pretty(&serde_json::json!({
-                        "peer_id": peer_id.to_string()
-                    }))
-                    .expect("JSON serialization possible");
-                    println!("{}", json);
-                }
-                Format::Yaml => {
-                    let yaml = serde_yaml::to_string(&serde_json::json!({
-                        "peer_id": peer_id.to_string()
-                    }))
-                    .expect("YAML serialization possible");
-                    println!("{}", yaml);
-                }
+        None => match format {
+            Format::Json => {
+                let json = serde_json::to_string_pretty(&serde_json::json!({
+                    "peer_id": peer_id.to_string()
+                }))
+                .expect("JSON serialization possible");
+                println!("{}", json);
             }
-        }
+            Format::Yaml => {
+                let yaml = serde_yaml::to_string(&serde_json::json!({
+                    "peer_id": peer_id.to_string()
+                }))
+                .expect("YAML serialization possible");
+                println!("{}", yaml);
+            }
+        },
     }
 }
-
 
 fn generate_ed25519() -> Ed25519KeyPair {
     Ed25519KeyPair::from_seed(&[])
