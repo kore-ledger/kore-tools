@@ -8,9 +8,6 @@
 
 FROM alpine:3.16 AS pre-builder
 RUN apk update && apk add openssl-dev pkgconfig
-# RUN find /usr -name 'libssl.so*'
-# RUN apk info -L clang-dev
-# llvm clang
 
 FROM messense/rust-musl-cross:aarch64-musl AS builder-arm64
 ENV OPENSSL_LIB_DIR=/usr/local/musl/aarch64-unknown-linux-musl/lib
@@ -54,8 +51,6 @@ RUN chmod +x ./script/run.sh
 CMD ["/script/run.sh"]
 
 
-
-
 FROM messense/rust-musl-cross:x86_64-musl AS builder-amd64
 ENV OPENSSL_LIB_DIR=/usr/local/musl/x86_64-unknown-linux-musl/lib
 ENV OPENSSL_INCLUDE_DIR=/usr/local/musl/x86_64-unknown-linux-musl/include/openssl
@@ -92,6 +87,7 @@ COPY --from=builder-amd64 /home/rust/src/target/x86_64-unknown-linux-musl/releas
 COPY --from=builder-amd64 /home/rust/src//target/x86_64-unknown-linux-musl/release/kore-sign /usr/local/bin/kore-sign
 COPY --from=builder-amd64 /home/rust/src//target/x86_64-unknown-linux-musl/release/kore-patch /usr/local/bin/kore-patch
 COPY --from=builder-amd64 /home/rust/src//target/x86_64-unknown-linux-musl/release/control /usr/local/bin/control
+
 RUN apk add --no-cache --upgrade bash
 COPY run.sh ./script/run.sh
 RUN chmod +x ./script/run.sh
