@@ -25,10 +25,12 @@ async fn main() {
         println!("Server started at: {}", server);
     }
 
-    let listener = tokio::net::TcpListener::bind(num_servers.last().unwrap().clone())
+    let last = num_servers.last().unwrap().clone();
+    let listener = tokio::net::TcpListener::bind(last.clone())
         .await
         .unwrap();
 
+    println!("Server started at: {}", last);
     axum::serve(listener, build_routes())
         .with_graceful_shutdown(async move {
             tokio::select! {
