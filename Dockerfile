@@ -39,20 +39,33 @@ COPY run.sh ./script/run.sh
 RUN chmod +x ./script/run.sh
 ENTRYPOINT ["/script/run.sh"]
 
+
 FROM messense/rust-musl-cross:x86_64-musl as builder-amd64
-RUN apt-get update && apt-get install --no-install-recommends -y build-essential cmake \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
+ENV PKG_CONFIG_PATH=/usr/local/musl/x86_64-unknown-linux-gnu/lib/pkgconfig
 COPY . .
-RUN rustup target add aarch64-unknown-linux-musl
-RUN cargo build --release --target aarch64-unknown-linux-musl --bin kore-keygen
-RUN cargo build --release --target aarch64-unknown-linux-musl --bin kore-sign
-RUN cargo build --release --target aarch64-unknown-linux-musl --bin kore-patch
+RUN rustup target add x86_64-unknown-linux-gnu
+COPY --from=pre-builder usr/bin/bomtool /usr/local/musl/x86_64-unknown-linux-gnu/bin/bomtool
+COPY --from=pre-builder usr/bin/pkg-config /usr/local/musl/x86_64-unknown-linux-gnu/bin/pkg-config
+COPY --from=pre-builder usr/bin/pkgconf /usr/local/musl/x86_64-unknown-linux-gnu/bin/pkgconf
+COPY --from=pre-builder usr/lib/libpkgconf.so.4.0.0 /usr/local/musl/x86_64-unknown-linux-gnu/lib/libpkgconf.so.4.0.0
+COPY --from=pre-builder usr/lib/libpkgconf.so.4 /usr/local/musl/x86_64-unknown-linux-gnu/lib/libpkgconf.so.4
+COPY --from=pre-builder usr/include/proj.h /usr/local/musl/x86_64-unknown-linux-gnu/include/proj.h
+COPY --from=pre-builder usr/include/openssl /usr/local/musl/x86_64-unknown-linux-gnu/include/openssl
+COPY --from=pre-builder usr/lib/libcrypto.so /usr/local/musl/x86_64-unknown-linux-gnu/lib/libcrypto.so
+COPY --from=pre-builder usr/lib/libssl.* /usr/local/musl/x86_64-unknown-linux-gnu/lib
+COPY --from=pre-builder usr/lib/pkgconfig /usr/local/musl/x86_64-unknown-linux-gnu/lib/pkgconfig
+RUN cp -r /usr/local/musl/x86_64-unknown-linux-gnu/bin/* /usr/bin
+RUN cp -r /usr/local/musl/x86_64-unknown-linux-gnu/lib/* /usr/lib
+RUN cargo build --release --target x86_64-unknown-linux-gnu --bin control
+RUN cargo build --release --target x86_64-unknown-linux-gnu --bin kore-keygen
+RUN cargo build --release --target x86_64-unknown-linux-gnu --bin kore-sign
+RUN cargo build --release --target x86_64-unknown-linux-gnu --bin kore-patch
 
 FROM alpine:3.16 as amd64
-COPY --from=builder-arm64 /home/rust/src/target/aarch64-unknown-linux-musl/release/kore-keygen /usr/local/bin/kore-keygen
-COPY --from=builder-arm64 /home/rust/src//target/aarch64-unknown-linux-musl/release/kore-sign /usr/local/bin/kore-sign
-COPY --from=builder-arm64 /home/rust/src//target/aarch64-unknown-linux-musl/release/kore-patch /usr/local/bin/kore-patch
+COPY --from=builder-amd64 /home/rust/src/target/x86_64-unknown-linux-gnu/release/kore-keygen /usr/local/bin/kore-keygen
+COPY --from=builder-amd64 /home/rust/src/target/x86_64-unknown-linux-gnu/release/kore-sign /usr/local/bin/kore-sign
+COPY --from=builder-amd64 /home/rust/src/target/x86_64-unknown-linux-gnu/release/kore-patch /usr/local/bin/kore-patch
+COPY --from=builder-amd64 /home/rust/src/target/x86_64-unknown-linux-gnu/release/control /usr/local/bin/control
 RUN apk add --no-cache --upgrade bash
 COPY run.sh ./script/run.sh
 RUN chmod +x ./script/run.sh
