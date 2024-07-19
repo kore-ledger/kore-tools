@@ -1,5 +1,5 @@
 [workspace]
-members = ["keygen", "patch", "sign"]
+members = ["keygen", "patch", "sign", "control"]
 resolver = "2"
 
 

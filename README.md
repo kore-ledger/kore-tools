@@ -11,6 +11,7 @@ $ sudo apt install -y libprotobuf-dev protobuf-compiler cmake
 $ cargo install --locked --path keygen
 $ cargo install --locked --path patch
 $ cargo install --locked --path sign
+$ cargo install --locked --path control
 $ kore-keygen -h
 $ kore-sign -h
 $ kore-patch -h
@@ -43,6 +44,13 @@ kore-patch '{"members":[]}' '{"members":[{"id":"EtbFWPL6eVOkvMMiAYV8qio291zd3viC
 
 ```
 
+### Usage ok control
+```bash
+# Basic usage example
+export SERVERS="0.0.0.0:3040,0.0.0.0:3041"
+control --run
+```
+
 ## Docker images
 Prebuilt docker images are available at [Docker Hub](https://hub.docker.com/repository/docker/koreadmin/kore-tools/tags).
 
@@ -68,4 +76,9 @@ docker run koreadmin/kore-tools:latest kore-patch '{"members":[]}' '{"members":[
 docker run -v $(pwd):/mnt -w /mnt koreadmin/kore-tools:latest kore-keygen -p a
 docker run -v $(pwd):/mnt -w /mnt koreadmin/kore-tools:latest kore-keygen -p a -r keys-Ed25519/private_key.der
 docker run -v $(pwd):/mnt -w /mnt koreadmin/kore-tools:latest kore-keygen -p a -r keys-Ed25519/public_key.der -d public-key
+```
+
+### Usage Control
+```sh
+docker run -e SERVERS="0.0.0.0:3040" kore-tools:arm64 control -- run
 ```
