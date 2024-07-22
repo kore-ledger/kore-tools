@@ -18,7 +18,7 @@ $ kore-patch -h
 ```
 
 ## Usage
-### Usage ok kore-keygen
+### Usage kore-keygen
 ```bash
 # Generate pkcs8 encrpty with pkcs5(ED25519)
 kore-keygen -p a
@@ -31,19 +31,19 @@ kore-keygen -p a -r keys-secp2561k/public_key.der -m secp256k1 -d public-key
 ```
 Visit the [Kore Tools guide](https://www.kore-ledger.net/docs/learn/) to learn how to use the tools.
 
-### Usage ok kore-sign
+### Usage kore-sign
 ```bash
 # Basic usage example
 kore-sign --id-private-key 2a71a0aff12c2de9e21d76e0538741aa9ac6da9ff7f467cf8b7211bd008a3198 '{"Transfer":{"subject_id":"JjyqcA-44TjpwBjMTu9kLV21kYfdIAu638juh6ye1gyU","public_key":"E9M2WgjXLFxJ-zrlZjUcwtmyXqgT1xXlwYsKZv47Duew"}}'
 ```
 
-### Usage ok kore-patch
+### Usage kore-patch
 ```bash
 # Basic usage example
 kore-patch '{"members":[]}' '{"members":[{"id":"EtbFWPL6eVOkvMMiAYV8qio291zd3viCMepUL6sY7RjA","name":"ACME"}]}'
 ```
 
-### Usage ok control
+### Usage control
 ```bash
 # Basic usage example
 export SERVERS="0.0.0.0:3040,0.0.0.0:3041"
@@ -58,19 +58,19 @@ If you want to build the image yourself, then you should do it in the following 
 docker pull koreadmin/kore-tools:0.5
 ```
 
-### Usage ok kore-sign
+### Usage kore-sign
 ```sh
 # Basic usage example
 docker run koreadmin/kore-tools:0.5 kore-sign --id-private-key 2a71a0aff12c2de9e21d76e0538741aa9ac6da9ff7f467cf8b7211bd008a3198 '{"Transfer":{"subject_id":"JjyqcA-44TjpwBjMTu9kLV21kYfdIAu638juh6ye1gyU","public_key":"E9M2WgjXLFxJ-zrlZjUcwtmyXqgT1xXlwYsKZv47Duew"}}'
 ```
 
-### Usage ok kore-patch
+### Usage kore-patch
 ```sh
 # Basic usage example
 docker run koreadmin/kore-tools:0.5 kore-patch '{"members":[]}' '{"members":[{"id":"EtbFWPL6eVOkvMMiAYV8qio291zd3viCMepUL6sY7RjA","name":"ACME"}]}'
 ```
 
-### Usage ok kore-keygen
+### Usage kore-keygen
 ```sh
 docker run -v $(pwd):/mnt -w /mnt koreadmin/kore-tools:0.5 kore-keygen -p a
 docker run -v $(pwd):/mnt -w /mnt koreadmin/kore-tools:0.5 kore-keygen -p a -r keys-Ed25519/private_key.der
