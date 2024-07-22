@@ -44,21 +44,20 @@ async fn handler_push_blocklist(
 }
 
 pub fn build_routes() -> Router {
-    debug!("Creating default onject");
+    debug!("Creating default object");
     let allowlist_state = Arc::new(RwLock::new(read_allowlist_from_env()));
     let blocklist_state = Arc::new(RwLock::new(read_blocklist_from_env()));
 
     debug!("Creating routes");
-    let public = Router::new()
+    let allowlist_routes = Router::new()
         .route("/allow", get(handler_get_allowlist))
-        .route("/block", get(handler_get_blocklist))
         .route("/allow", put(handler_push_allowlist))
-        .route("/block", put(handler_push_blocklist))
-        .layer(
-            ServiceBuilder::new()
-                .layer(Extension(allowlist_state))
-                .layer(Extension(blocklist_state)),
-        );
+        .layer(ServiceBuilder::new().layer(Extension(allowlist_state)));
 
-    Router::new().merge(public)
+    let blocklist_routes = Router::new()
+        .route("/block", get(handler_get_blocklist))
+        .route("/block", put(handler_push_blocklist))
+        .layer(ServiceBuilder::new().layer(Extension(blocklist_state)));
+
+    Router::new().merge(allowlist_routes).merge(blocklist_routes)
 }
