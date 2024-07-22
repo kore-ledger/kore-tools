@@ -78,6 +78,8 @@ docker run -v $(pwd):/mnt -w /mnt koreadmin/kore-tools:0.5 kore-keygen -p a -r k
 ```
 
 ### Usage Control
+
 ```sh
-docker run -e SERVERS="0.0.0.0:3040" -e ALLOWLIST="172.0.1.2" koreadmin/kore-tools:0.5 control
+# Important to expose the port that is used for the server
+docker run -p 3040:3040 -e  SERVERS="0.0.0.0:3040" -e ALLOWLIST="172.0.1.2" koreadmin/kore-tools:0.5 control
 ```
